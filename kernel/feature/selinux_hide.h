@@ -281,6 +281,29 @@ static __always_inline void replace_after_second_colon(char *str, size_t bound)
 		second[2] = '7';
 }
 
+#ifndef get_random_u32
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 11, 0)
+#include <linux/random.h>
+#include <linux/siphash.h>
+static inline u32 __compat_get_random_u32(void)
+{
+	static siphash_key_t key;
+	static u32 counter = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 0)
+	static bool has_seeded = false;
+	if (unlikely(!has_seeded)) {
+		get_random_bytes(&key, sizeof(key));
+		has_seeded = true;
+	}
+#else
+	get_random_once(&key, sizeof(key));
+#endif
+	return siphash_2u32(counter++, get_random_int(), &key);
+}
+#define get_random_u32 __compat_get_random_u32
+#endif
+#endif
+
 static noinline void do_useless_alloc(size_t sz)
 {
 	volatile uint32_t random = get_random_u32();
